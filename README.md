@@ -96,13 +96,13 @@ Figma URLs encode node ids as `NNNN-NNNN`. Replace `-` with `:` and that's the G
 Output:
 
 ```
-FOUND 52502:42168 → [FRAME] 'FDS Results - Failed'
+FOUND 52502:42168 → [FRAME] ' Results - Failed'
 
 Parent chain (innermost → root):
-  [FRAME     ] 'FDS Results - Failed'
-  [SECTION   ] 'FDS RESULTS REJECTED'
-  [SECTION   ] 'Biller - FDS - Maker'
-  [CANVAS    ] '     • ABB xxx - FDS - Biller - Ichsan'
+  [FRAME     ] ' Results - Failed'
+  [SECTION   ] ' RESULTS REJECTED'
+  [SECTION   ] 'folow '
+  [CANVAS    ] '     • ABB xxx -'
   [DOCUMENT  ] 'Document'
 
 Children (depth 1):
