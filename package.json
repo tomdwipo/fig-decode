@@ -1,0 +1,38 @@
+{
+  "name": "fig-decode",
+  "version": "1.0.0",
+  "description": "Decode Figma .fig files (format v100+) into a JSON node tree. Ships as a Claude Code skill + standalone CLI.",
+  "main": "decode.js",
+  "bin": {
+    "fig-decode": "./decode.js"
+  },
+  "scripts": {
+    "decode": "node decode.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tomdwipo/fig-decode.git"
+  },
+  "keywords": [
+    "figma",
+    "fig",
+    "decoder",
+    "kiwi-schema",
+    "design-system",
+    "claude-code",
+    "claude-code-skill"
+  ],
+  "author": "Tommy Dwi Putranto",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tomdwipo/fig-decode/issues"
+  },
+  "homepage": "https://github.com/tomdwipo/fig-decode#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "kiwi-schema": "^0.5.0",
+    "pako": "^2.1.0"
+  }
+}
