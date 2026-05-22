@@ -102,7 +102,7 @@ Parent chain (innermost → root):
   [FRAME     ] ' Results - Failed'
   [SECTION   ] ' RESULTS REJECTED'
   [SECTION   ] 'folow '
-  [CANVAS    ] '     • ABB xxx -'
+  [CANVAS    ] '     •  xxx -'
   [DOCUMENT  ] 'Document'
 
 Children (depth 1):
