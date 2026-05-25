@@ -57,11 +57,12 @@ if command -v zstd  >/dev/null; then echo "  ✅ zstd  $(zstd --version | head -
 if command -v unzip >/dev/null; then echo "  ✅ unzip"; else echo "  ❌ unzip missing"; fi
 echo
 echo "Next steps:"
-echo "  1. Decode a .fig:"
+echo "  1. Decode a .fig or .jam:"
 echo "     $SKILL_DIR/decode.sh \"\$HOME/Downloads/foo.fig\""
+echo "     $SKILL_DIR/decode.sh \"\$HOME/Downloads/foo.jam\""
 echo
 echo "  2. Look up a Figma URL node-id:"
 echo "     $SKILL_DIR/scripts/find_node.py 52502-42168"
 echo
-echo "  3. Or in Claude Code, just say:  /fig-decode <path/to/foo.fig>"
+echo "  3. Or in Claude Code, just say:  /fig-decode <path/to/foo.fig|.jam>"
 echo "     (the skill auto-loads from ~/.claude/skills/ in every Claude session)"

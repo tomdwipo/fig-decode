@@ -1,15 +1,16 @@
 # fig-decode
 
-> Decode Figma `.fig` files (format v100+) into a structured JSON node tree — locally, with no Figma cloud access required.
+> Decode Figma `.fig` design files **and** FigJam `.jam` board files (format v100+) into a structured JSON node tree — locally, with no Figma cloud access required.
 
-Ships as a [Claude Code](https://claude.com/claude-code) skill **and** a standalone CLI. Lets any developer ask *"what's at Figma node 52502:42168?"* without uploading the design to Figma cloud, without an API token, without leaving the terminal.
+Ships as a [Claude Code](https://claude.com/claude-code) skill **and** a standalone CLI. Lets any developer ask *"what's at Figma node 52502:42168?"* or *"render the flow at FigJam section 7870-221"* without uploading the design to Figma cloud, without an API token, without leaving the terminal.
 
 ```bash
 # one-line install
 curl -fsSL https://raw.githubusercontent.com/tomdwipo/fig-decode/main/install.sh | bash
 
-# then decode a .fig
+# decode either container — same script
 ~/.claude/skills/fig-decode/decode.sh ~/Downloads/your-design.fig
+~/.claude/skills/fig-decode/decode.sh ~/Downloads/your-board.jam
 
 # look up a Figma URL node-id (replace - with : or pass either form)
 ~/.claude/skills/fig-decode/scripts/find_node.py 52502-42168
@@ -19,7 +20,22 @@ curl -fsSL https://raw.githubusercontent.com/tomdwipo/fig-decode/main/install.sh
 
 Figma's `.fig` export is a proprietary binary format. The community OSS parser ([`fig-kiwi@0.0.1`](https://www.npmjs.com/package/fig-kiwi)) targets format **v15**; current Figma exports are **v100+** with two different compression schemes inside (DEFLATE for the schema chunk, **zstd** for the document chunk). Out-of-the-box tooling does not handle this combination.
 
+FigJam `.jam` exports use the **same** Kiwi container layout but stamp a different 8-byte magic (`fig-jam.` instead of `fig-kiwi`) and ship a different schema with whiteboard-shaped node types (`SHAPE_WITH_TEXT`, `CONNECTOR`, `STICKY`, `SECTION`, `TABLE`). The `fig-kiwi` npm package rejects `.jam` files outright on the magic check.
+
 This skill wraps the right combination of decoders so anyone can introspect a design export locally — no Figma cloud account, no API token, no leaking sensitive designs to third-party renderers.
+
+## `.fig` vs `.jam` — same container, different magic byte
+
+| | `.fig` (Figma Design) | `.jam` (FigJam) |
+|---|---|---|
+| Outer container | ZIP with `canvas.fig` inside | ZIP with `canvas.fig` inside |
+| 8-byte magic | `fig-kiwi` | `fig-jam.` (last byte is a sub-version) |
+| Schema chunk compression | DEFLATE | DEFLATE |
+| Document chunk compression | zstd | zstd |
+| Schema | Figma Design types | FigJam types (SHAPE_WITH_TEXT, CONNECTOR, …) |
+| URL pattern | `figma.com/design/<key>/...` | `figma.com/board/<key>/...` |
+
+The decoder accepts both (`MAGIC_RE = /^fig-(kiwi|jam\.)/`) and logs which container it saw.
 
 ## Install
 
@@ -53,28 +69,29 @@ Claude will fetch the repo, run `install.sh`, verify dependencies, and walk you 
 - **`zstd` CLI** — `brew install zstd` on macOS (Figma v100+ uses zstd for the document payload)
 - **`unzip`** — built into macOS / standard on Linux
 
-## How to get a `.fig` file
+## How to get a `.fig` or `.jam` file
 
 ### From Figma Desktop
 
 1. Open the design in Figma Desktop
 2. **File → Save local copy…**
-3. Save anywhere (e.g. `~/Downloads/My Design.fig`)
+3. Save anywhere (e.g. `~/Downloads/My Design.fig` or `~/Downloads/My Board.jam`)
 
 ### From Figma Web
 
-1. Open the design at `figma.com/design/<key>/...`
+1. Open the design at `figma.com/design/<key>/...` (Design) or `figma.com/board/<key>/...` (FigJam)
 2. **Top-left menu (hamburger) → File → Save local copy…**
-3. Browser downloads the `.fig`
+3. Browser downloads `.fig` (Design) or `.jam` (FigJam)
 
-> 💡 The `.fig` is a self-contained file (an outer ZIP archive). Production design files can be 250+ MB. Don't commit them to git — Figma is the source of truth.
+> 💡 The `.fig` / `.jam` is a self-contained file (an outer ZIP archive). Production design files can be 250+ MB. Don't commit them to git — Figma is the source of truth.
 
 ## Usage
 
-### Decode a `.fig` file
+### Decode a `.fig` or `.jam` file
 
 ```bash
-~/.claude/skills/fig-decode/decode.sh ~/Downloads/my-design.fig
+~/.claude/skills/fig-decode/decode.sh ~/Downloads/my-design.fig    # Figma Design
+~/.claude/skills/fig-decode/decode.sh ~/Downloads/my-board.jam     # FigJam
 ```
 
 Output goes to `$TMPDIR/fig-decode-<basename>/` by default. Use `--out=DIR` to redirect:
@@ -159,13 +176,14 @@ For a typical 264 MB `.fig` (Figma format v106):
 ## How decoding works (under the hood)
 
 ```
-foo.fig (264 MB ZIP archive)
-   │
+foo.fig (264 MB ZIP archive)        foo.jam (FigJam ZIP archive)
+   │                                     │
    ├─ unzip ──> canvas.fig, meta.json, thumbnail.png, images/
    │
-   └─ canvas.fig (fig-kiwi binary, v100+)
+   └─ canvas.fig (Kiwi binary, v100+)
         │
-        ├─ header: magic "fig-kiwi" (8B) + uint32 version (4B)
+        ├─ header: magic (8B) + uint32 version (4B)
+        │     magic ∈ {"fig-kiwi", "fig-jam."}    ← only difference between containers
         │
         ├─ chunk[0] (length-prefixed)
         │     └─ pako.inflateRaw  ──> Kiwi schema bytes (~28 KB → 68 KB)
@@ -173,7 +191,7 @@ foo.fig (264 MB ZIP archive)
         │                       └─ kiwi-schema.compileSchema  ──> compiled walker
         │
         └─ chunk[1] (length-prefixed, zstd-framed)
-              └─ zstd -d  ──> Kiwi message stream (23 MB → 232 MB)
+              └─ zstd -d  ──> Kiwi message stream
                        └─ compiled.decodeMessage(bb) until EOF  ──> Message[]
                                 └─ flatten m.nodeChanges to nodes-summary.json
 ```
@@ -185,6 +203,10 @@ foo.fig (264 MB ZIP archive)
 2. **The document is a *stream* of `Message` records, not one big Message.** Loop `compiled.decodeMessage(bb)` until the buffer is exhausted.
 
 3. **`fig-kiwi@0.0.1` on npm only handles v15.** This repo is for v100+ files (current Figma exports).
+
+4. **FigJam magic has a sub-version byte.** The 8-byte magic for FigJam is `fig-jam.` where the last byte is a sub-version (an ASCII `.` for the v106 board we tested; may change). Match with a regex `/^fig-(kiwi|jam\.)/` rather than a string equals. Same Kiwi schema layout otherwise — no separate decoder needed.
+
+5. **FigJam connector graph isn't a parent/child tree.** A single shape can be the target of many connectors and walking `nodes-summary.json` alone won't reconstruct the flow. To render a flow, you need `--full` and to follow `connectorStart.endpointNodeID` → `connectorEnd.endpointNodeID` edges.
 
 ## Cross-session context — Claude remembers across chats
 
@@ -212,8 +234,9 @@ For persistent storage across reboots, pass `--out=` to a durable location:
 
 - **Structural tree only by default.** `nodes-summary.json` captures `type`, `name`, `parent`, `guid`, `phase`. Pixel-level properties (fills, strokes, fonts, geometry) exist in `document.bin` but the lightweight walker doesn't surface them. Pass `--full` to dump the entire decoded `Message[]`.
 - **Outputs go to `$TMPDIR`.** Cleared on macOS reboot. Pass `--out=DIR` to persist.
-- **The `.fig` file is huge.** Don't commit it to git. Re-download from Figma when the design changes significantly.
+- **The `.fig` / `.jam` file is huge.** Don't commit it to git. Re-download from Figma when the design changes significantly.
 - **v100+ assumed.** Older `.fig` files (v15-v99) use a different layout. Not supported by this decoder; use `fig-kiwi@0.0.1` for those instead.
+- **FigJam connector graph isn't a parent/child tree.** Walking `nodes-summary.json` alone won't reconstruct a flow — you need `--full` and to follow connector endpoints. See _Non-obvious gotcha #5_ above.
 
 ## When NOT to use this
 
@@ -236,6 +259,7 @@ If a future Figma update changes the format and this decoder breaks:
 1. Check the first 4 bytes of each chunk — Figma may switch compression again.
 2. Compare the new schema (`schema.txt`) against an old one to spot new types.
 3. If `compileSchema` chokes on a new primitive type, upgrade `kiwi-schema` (0.5 added uint64 support that 0.4 lacked).
+4. If FigJam ships a new sub-version magic (e.g. `fig-jam:`), widen the `MAGIC_RE` regex in `decode.js`.
 
 ## Contributing
 

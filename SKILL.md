@@ -1,11 +1,13 @@
 ---
 name: fig-decode
-description: Decode a Figma .fig file (format v100+) into a structured JSON node tree so questions like "what's at node 52502:42168?" can be answered without opening Figma. Useful for design auditing, Figma→code traceability, and PRD/Figma cross-checks when the design lives only as a .fig export.
+description: Decode a Figma .fig file or FigJam .jam file (format v100+) into a structured JSON node tree so questions like "what's at node 52502:42168?" can be answered without opening Figma. Useful for design auditing, Figma→code traceability, and PRD/Figma cross-checks when the design lives only as a local export.
 metadata:
   author: Tommy Dwi Putranto
   keywords:
   - figma
+  - figjam
   - fig-kiwi
+  - fig-jam
   - kiwi-schema
   - design-system
   - figma-decode
@@ -17,11 +19,15 @@ metadata:
 
 Invoke this skill when a user:
 
-- Provides a path to a `.fig` file on disk and asks to "look inside" / "explain" / "list pages" / "find a screen".
-- Pastes a Figma URL like `https://www.figma.com/design/<file-key>/...?node-id=NNNN-NNNN` **and** the corresponding `.fig` is available locally — translate the URL's `node-id` to `NNNN:NNNN` (replace `-` with `:`) and look it up.
+- Provides a path to a `.fig` (Figma Design) or `.jam` (FigJam) file on disk and asks to "look inside" / "explain" / "list pages" / "find a screen".
+- Pastes a Figma URL like `https://www.figma.com/design/<file-key>/...?node-id=NNNN-NNNN` or `https://www.figma.com/board/<file-key>/...?node-id=NNNN-NNNN` **and** the corresponding `.fig`/`.jam` is available locally — translate the URL's `node-id` to `NNNN:NNNN` (replace `-` with `:`) and look it up.
 - Asks "which screen in code corresponds to Figma node X?" — combine the decoded structure with a grep over the codebase.
 
 **Do not** invoke this skill if the file is only accessible via the Figma cloud — use `mcp__figma__*` tools for those (they need an API token and the file's cloud URL).
+
+### `.fig` vs `.jam`
+
+Both containers use the same Kiwi binary layout (8-byte magic + u32 version + length-prefixed chunks), so the same decoder handles both. The only difference is the 8-byte magic at offset 0: `fig-kiwi` for Figma Design exports, `fig-jam.` for FigJam exports. The skill detects the container at runtime and logs which one it saw. FigJam files yield FigJam-shaped node types (`SHAPE_WITH_TEXT`, `CONNECTOR`, `STICKY`, `SECTION`, `TABLE`) instead of `FRAME`/`COMPONENT`/`INSTANCE` heavy trees.
 
 ## Requirements
 
@@ -36,7 +42,8 @@ The decoder runs entirely locally:
 The pipeline lives in the same directory as this SKILL.md. From anywhere:
 
 ```bash
-~/.claude/skills/fig-decode/decode.sh "/path/to/file.fig"
+~/.claude/skills/fig-decode/decode.sh "/path/to/file.fig"   # Figma Design
+~/.claude/skills/fig-decode/decode.sh "/path/to/file.jam"   # FigJam
 # → prints the output directory it wrote to, defaults to $TMPDIR/fig-decode-<basename>
 ```
 

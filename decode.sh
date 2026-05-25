@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Decode a .fig file into a JSON node tree.
+# Decode a Figma .fig or FigJam .jam file into a JSON node tree.
 #
 # Usage:
-#   ./decode.sh <path/to/file.fig> [--out=DIR] [--full]
+#   ./decode.sh <path/to/file.fig|.jam> [--out=DIR] [--full]
 #
 # Requires: node 18+, zstd, unzip. First run installs npm deps locally.
 
@@ -12,7 +12,7 @@ SKILL_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SKILL_DIR"
 
 if [[ $# -lt 1 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    echo "Usage: $0 <file.fig> [--out=DIR] [--full]" >&2
+    echo "Usage: $0 <file.fig|.jam> [--out=DIR] [--full]" >&2
     exit 2
 fi
 

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Decode a Figma .fig file (format v100+) into a JSON node tree.
+// Decode a Figma .fig or FigJam .jam file (format v100+) into a JSON node tree.
+// Both containers use the same Kiwi binary layout; only the 8-byte magic differs
+// (.fig = "fig-kiwi", .jam = "fig-jam.").
 //
 // Usage:
-//   node decode.js <path/to/file.fig> [--out=DIR] [--full]
+//   node decode.js <path/to/file.fig|.jam> [--out=DIR] [--full]
 //
 // Outputs in --out (default $TMPDIR/fig-decode-<basename>):
 //   canvas.fig, meta.json, thumbnail.png, images/, schema.bin, schema.txt,
@@ -17,17 +19,17 @@ const { decodeBinarySchema, compileSchema, prettyPrintSchema, ByteBuffer } = req
 
 const args = process.argv.slice(2);
 if (args.length === 0 || args.includes('-h') || args.includes('--help')) {
-    console.error('Usage: node decode.js <file.fig> [--out=DIR] [--full]');
+    console.error('Usage: node decode.js <file.fig|.jam> [--out=DIR] [--full]');
     process.exit(args.length === 0 ? 2 : 0);
 }
 const figPath = args.find(a => !a.startsWith('-'));
 if (!figPath || !fs.existsSync(figPath)) {
-    console.error(`Input .fig not found: ${figPath}`);
+    console.error(`Input not found: ${figPath}`);
     process.exit(2);
 }
 const outArg = args.find(a => a.startsWith('--out='));
 const FULL = args.includes('--full');
-const base = path.basename(figPath, '.fig').replace(/\s+/g, '_');
+const base = path.basename(figPath).replace(/\.(fig|jam)$/i, '').replace(/\s+/g, '_');
 const OUT = outArg ? outArg.slice(6) : path.join(os.tmpdir(), `fig-decode-${base}`);
 fs.mkdirSync(OUT, { recursive: true });
 function log(msg) { console.error(`[fig-decode] ${msg}`); }
@@ -38,11 +40,16 @@ const canvasPath = path.join(OUT, 'canvas.fig');
 if (!fs.existsSync(canvasPath)) throw new Error('canvas.fig missing inside outer ZIP');
 
 const canvas = fs.readFileSync(canvasPath);
-const PRELUDE = 'fig-kiwi';
-if (canvas.slice(0, 8).toString() !== PRELUDE) throw new Error('Bad magic');
+// Figma Design files start with 'fig-kiwi'; FigJam (.jam) files start with 'fig-jam.' (last byte is a sub-version).
+// Both use the same Kiwi container layout (8-byte magic + u32 version + length-prefixed chunks).
+const MAGIC_RE = /^fig-(kiwi|jam\.)/;
+const magic = canvas.slice(0, 8).toString();
+if (!MAGIC_RE.test(magic)) throw new Error('Bad magic: ' + JSON.stringify(magic));
+const container = magic.startsWith('fig-jam') ? 'fig-jam' : 'fig-kiwi';
+log(`container: ${container} (magic ${JSON.stringify(magic)})`);
 const dv = new DataView(canvas.buffer, canvas.byteOffset, canvas.byteLength);
 const version = dv.getUint32(8, true);
-log(`fig-kiwi version ${version}`);
+log(`${container} version ${version}`);
 
 let off = 12;
 const chunks = [];
